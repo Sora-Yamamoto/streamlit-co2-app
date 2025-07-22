@@ -53,7 +53,7 @@ c = st.sidebar.number_input("c", value=0.78380, step=1e-5, format="%.5f")
 
 # -----------------------------------------------------------------------------
 # 2. 複数ファイルアップロード
-st.header("2. 比較する CSV ファイルを複数選択")
+st.header("1. 比較する CSV ファイルを複数選択")
 uploaded_files = st.file_uploader(
     "CSV ファイルを複数選択 (Ctrl/Cmd + クリック)",
     type="csv", accept_multiple_files=True
@@ -85,7 +85,7 @@ for f in uploaded_files:
 
 # -----------------------------------------------------------------------------
 # 4. 各ファイル個別プロット
-st.header("3. 各ファイルの pCO₂ 時系列プロット (Time ≥ 0s)")
+st.header("2. 各ファイルの pCO₂ 時系列プロット (Time ≥ 0s)")
 for name, df in all_dfs.items():
     st.subheader(f"● {name}")
     fig, ax = plt.subplots(figsize=(6, 3))
@@ -100,7 +100,7 @@ for name, df in all_dfs.items():
 
 # -----------------------------------------------------------------------------
 # 5. 全ファイル重ね書きプロット
-st.header("4. 全ファイル重ね書きプロット (Time ≥ 0s)")
+st.header("3. 全ファイル重ね書きプロット (Time ≥ 0s)")
 fig, ax = plt.subplots(figsize=(6, 3))
 for name, df in all_dfs.items():
     sub = df[df['Time'] >= 0]
@@ -114,7 +114,7 @@ st.pyplot(fig, use_container_width=True)
 
 
 # 6. 繰り返し精度 (σ)
-st.header("5. 繰り返し精度(σ)")
+st.header("4. 繰り返し精度(σ)")
 for name, df in all_dfs.items():
     # 区間ごとの medians, logs_all, times, durations を取得
     medians, logs_all, times, durations = extract_medians_and_logs(
@@ -141,7 +141,7 @@ for name, df in all_dfs.items():
         st.table(sigma_df)
 
 # 7. 分解能解析
-st.header("6. 分解能解析")
+st.header("5. 分解能解析")
 for name, df in all_dfs.items():
     with st.expander(f"{name} の分解能解析", False):
         # ────────────────────────
@@ -182,7 +182,7 @@ for name, df in all_dfs.items():
         st.table(df_res)
 
 # 8. 応答速度 t₉₀
-st.header("7. 応答速度 (t₉₀)")
+st.header("6. 応答速度 (t₉₀)")
 for name, df in all_dfs.items():
     with st.expander(f"{name} の応答速度", False):
         for idx,(s,e) in enumerate(intervals,1):
@@ -283,7 +283,7 @@ cv['Rank_sig'] = cv['CV_sig'].apply(get_rank)
 for col in ['CV_med','CV_t90','CV_sig']:
     cv[col] = cv[col].map(lambda x: f"{x:.1f}%")
 
-st.header("8. 再現性評価：変動係数 (CV %)")
+st.header("7. 再現性評価：変動係数 (CV %)")
 st.markdown(
     "この表は，同じ区間を複数回測定したときに、\n"
     "- pCO₂ 中央値\n"
@@ -334,7 +334,7 @@ icc = pg.intraclass_corr(
     ratings='pCO2'         # 生データをそのまま評価値に
 )
 
-st.header("9. ICC — pCO₂ 中央値")
+st.header("8. ICC — pCO₂ 中央値")
 st.markdown("""
 この表では，区間内で得られた pCO₂ 中央値の一致度を  クラス内相関係数（ICC）で評価しています。  
 ICC が 1 に近いほど，ファイル間で非常によく一致していることを示します。  
