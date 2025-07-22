@@ -1,4 +1,3 @@
-cat <<EOF > requirements.txt
 streamlit>=1.0
 pandas
 numpy
@@ -8,4 +7,3 @@ statsmodels
 openpyxl
 pyinstaller
 pingouin
-EOF
