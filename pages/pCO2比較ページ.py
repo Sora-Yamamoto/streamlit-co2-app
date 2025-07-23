@@ -1,4 +1,5 @@
 import streamlit as st
+import io
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -76,8 +77,8 @@ for f in uploaded_files:
         A,B,C = a, b, (c - Rv)
         disc = B*B - 4*A*C
         x1 = (-B + np.sqrt(disc)) / (2*A)
-        x2 = (-B - np.sqrt(disc)) / (2*A)
-        return 10 ** max(x1, x2)
+        #x2 = (-B - np.sqrt(disc)) / (2*A)
+        return 10 ** x1
     df['pCO2'] = df['R_CO2'].apply(est_pCO2)
     # ファイル名から拡張子 .csv を除去
     label = f.name.rsplit('.', 1)[0]
@@ -99,17 +100,65 @@ for name, df in all_dfs.items():
     st.pyplot(fig, use_container_width=True)
 
 # -----------------------------------------------------------------------------
+#""タイトル"""
+#日付複数選択も可能にする⇒グラフのタイトル（pCO₂ Calculation Results_{流路長｝_2025{/M/D}-{/D2}）
+
+#""凡例"""：測定回（Measurement 1, Measurement 2...
+
 # 5. 全ファイル重ね書きプロット
+
+
+# --- プロット本体 ---
 st.header("3. 全ファイル重ね書きプロット (Time ≥ 0s)")
+
+# --- サイドバーUI（ループ外） ---
+length = st.number_input(
+    "流路長 (mm)",
+    min_value=1,
+    value=600,
+    step=100
+)
+
+dates = st.date_input(
+    "測定日付 (複数選択可)",
+    value=[],
+    help="複数選択すると2つ目以降は「日」のみ表示します"
+)
+if isinstance(dates, (list, tuple)):
+    dates_list = list(dates)
+else:
+    dates_list = [dates]
+
+if dates_list:
+    date_str = f"{2025}/{dates_list[0].month}/{dates_list[0].day}"
+    for d in dates_list[1:]:
+        date_str += f"-{d.day}"
+else:
+    date_str = "未選択"
+
+
 fig, ax = plt.subplots(figsize=(6, 3))
-for name, df in all_dfs.items():
-    sub = df[df['Time'] >= 0]
-    ax.plot(sub['Time'], sub['pCO2'], marker='o', markersize=3, linewidth=1, label=name)
-ax.set_title("重ね書き pCO₂", fontsize=12)
+
+# all_dfs: {'ファイル名': DataFrame, …}
+for i, (name, df) in enumerate(all_dfs.items(), start=1):
+    sub = df[df['Time'] >= 0].sort_values(by='Time')
+    ax.plot(
+        sub['Time'],
+        sub['pCO2'],
+        marker='o',
+        markersize=3,
+        linewidth=1,
+        label=f"Measurement {i}"
+    )
+
+# タイトルと凡例
+title = f"pCO₂ Calculation Results_{length}mm_{date_str}"
+ax.set_title(title, fontsize=12)
 ax.set_xlabel("Time [s]", fontsize=10)
 ax.set_ylabel("pCO₂ [µatm]", fontsize=10)
 ax.legend(fontsize=8)
 ax.tick_params(labelsize=8)
+
 st.pyplot(fig, use_container_width=True)
 
 
@@ -243,6 +292,85 @@ for name, df in all_dfs.items():
             'σ_pCO₂ [µatm]': sigmas[idx],
             '分解能 [µatm]': raw_res[idx]
         })
+
+sigma_records, resolution_records, response_records = [], [], []
+
+for name, df in all_dfs.items():
+    medians, logs_all, times, durations = extract_medians_and_logs(
+        df, 'Time', 'A_R', intervals, return_times=True
+    )
+    # 繰り返し精度
+    p_sigmas = calculate_precision(df, 'Time', 'pCO2', times, durations)
+    ar_sigmas = [
+        (df[(df['Time']>=t0)&(df['Time']<t0+dur)]['A_R'].std()
+         if (t0 is not None and dur is not None and not df[(df['Time']>=t0)&(df['Time']<t0+dur)].empty)
+         else np.nan)
+        for t0, dur in zip(times, durations)
+    ]
+    for (label, _), σ_ar, σ_p in zip(logs_all, ar_sigmas, p_sigmas):
+        sigma_records.append({
+            'ファイル名': name, '区間': label,
+            'σ_AR': σ_ar,      'σ_pCO₂': σ_p
+        })
+
+    # 分解能解析
+    for i, ((label, _), median_i, median_prev, σ_ar) in enumerate(zip(
+            logs_all, medians, [None]+medians[:-1], [None]+ar_sigmas[:-1]), start=1):
+        if i == 1 or median_i is None or median_prev is None or σ_ar is None or np.isnan(σ_ar):
+            res_val = np.nan
+        else:
+            dp = uatm_vals[i-1] - uatm_vals[i-2]
+            dAR = median_i - median_prev
+            digit = 10**np.floor(np.log10(σ_ar)) if σ_ar>0 else 0
+            raw = abs(dp/dAR) * digit
+            sigd = -int(np.floor(np.log10(raw))) if raw>0 else 0
+            res_val = round(raw, sigd)
+        resolution_records.append({
+            'ファイル名': name, '区間': label,
+            '分解能 [µatm]': res_val
+        })
+
+    # 応答速度 t₉₀
+    for idx, (s, e) in enumerate(intervals, start=1):
+        seg = df[(df['Time']>=s)&(df['Time']<=e)]
+        if seg.empty:
+            t90 = np.nan
+        else:
+            p0 = seg['pCO2'].iloc[0]
+            ps = seg['pCO2'].tail(10).median()
+            d  = abs(p0-ps)
+            thr = p0 - 0.9*d if ps<p0 else p0 + 0.9*d
+            hit = seg[(seg['pCO2']<=thr) if ps<p0 else (seg['pCO2']>=thr)]
+            t90 = (hit['Time'].iloc[0] - s) if not hit.empty else np.nan
+        response_records.append({
+            'ファイル名': name,
+            '区間':       f"区間{idx}",
+            't₉₀ [s]':   t90
+        })
+
+# ② DataFrame 作成
+df_sigma = pd.DataFrame(sigma_records)
+df_res   = pd.DataFrame(resolution_records)
+df_resp  = pd.DataFrame(response_records)
+
+# ③ Excel 出力
+output = io.BytesIO()
+with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    df_sigma.to_excel(writer, sheet_name='Repeatability', index=False)
+    df_res.to_excel(writer,   sheet_name='Resolution Analysis', index=False)
+    df_resp.to_excel(writer,  sheet_name='Response Time', index=False)
+# ← ここで with を抜けると自動的にファイルがクローズされ、バッファに書き込まれます
+
+output.seek(0)
+
+
+# ダウンロードボタン（ファイル名に流路長を埋め込み）
+st.download_button(
+    label="結果をExcelでダウンロード",
+    data=output,
+    file_name=f"analysis_results_{length}mm.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
 
 

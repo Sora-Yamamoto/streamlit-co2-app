@@ -212,9 +212,9 @@ if res:
             # 両解を計算
             sqrt_disc = np.sqrt(disc)
             r1 = (-B + sqrt_disc) / (2*A)
-            r2 = (-B - sqrt_disc) / (2*A)
-            root = max(r1, r2)  # 物理的に妥当な（大きい方の）解を選択
-            return 10**root
+            #r2 = (-B - sqrt_disc) / (2*A)
+            #root = max(r1, r2)  # 物理的に妥当な（大きい方の）解を選択
+            return 10**r1
 
         df_out = df.copy()
         df_out["R_CO2"]          = df_out[ar_col].apply(calc_R)
