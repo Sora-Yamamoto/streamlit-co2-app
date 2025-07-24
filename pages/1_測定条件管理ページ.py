@@ -91,7 +91,14 @@ with st.form(key='measure_form'):
 
     gas_unit = st.selectbox("ガス交換ユニット材料", options=["PDMS and シリコーン膜","AF"])
     channel_len = st.selectbox("流路長 [mm]", options=[200,300,400,500,600,700,800,864], index=7)
-    abc_vals = st.text_input("回帰係数 a/b/c", value="0/0/0")
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        a_val = st.number_input("回帰係数 a", value=0.0, step=0.0001)
+    with col_b:
+        b_val = st.number_input("回帰係数 b", value=0.0, step=0.0001)
+    with col_c:
+        c_val = st.number_input("回帰係数 c", value=0.0, step=0.0001)
+
     notes = st.text_area("備考")
 
     submit = st.form_submit_button("保存")
@@ -113,7 +120,7 @@ if submit:
         'R_values': [Rv1, Rv2, Rv3, Rv4],
         'gas_unit': gas_unit,
         'channel_length': channel_len,
-        'abc': abc_vals,
+        'abc': [a_val, b_val, c_val], 
         'notes': notes
     }
     st.success("測定条件を保存しました！")
@@ -131,16 +138,27 @@ if mc:
         VAPOR_PRESSURE = 0.0313
         PRESSURE_ATM = 1.0
         uatm_vals = [(PRESSURE_ATM - VAPOR_PRESSURE) * x for x in mc['ppm_values']]
-        info_df = pd.DataFrame({
-            '項目': ['測定日','記入者','室温 [℃]','水温 [℃]','pCO₂ [ppm]','pCO₂ [µatm]','pH指示薬濃度 [µmol/l]',
-                    'ガス流量 [L/min]','流量 [ml/min]','ビーカー容量 [L]','溶液','ガス交換ユニット材料','流路長 [mm]','回帰係数 a/b/c','備考'],
-            '値': [
-                mc['date'], mc['recorder'], mc['room_temperature'], mc['water_temperature'],
-                "/".join(map(str, mc['ppm_values'])), "/".join(f"{v:.1f}" for v in uatm_vals), mc['ph_concentration'],
-                mc['gas_flow'], mc['flow_ml'], mc['beaker_volume'], mc['beaker_solution'],
-                mc['gas_unit'], mc['channel_length'], mc['abc'], mc['notes']
-            ]
-        })
+
+        info_items = [
+            ['測定日', mc['date']],
+            ['記入者', mc['recorder']],
+            ['室温 [℃]', mc['room_temperature']],
+            ['水温 [℃]', mc['water_temperature']],
+            ['pCO₂ [ppm]', "/".join(map(str, mc['ppm_values']))],
+            ['pCO₂ [µatm]', "/".join(f"{v:.1f}" for v in uatm_vals)],
+            ['pH指示薬濃度 [µmol/l]', mc['ph_concentration']],
+            ['ガス流量 [L/min]', mc['gas_flow']],
+            ['流量 [ml/min]', mc['flow_ml']],
+            ['ビーカー容量 [L]', mc['beaker_volume']],
+            ['溶液', mc['beaker_solution']],
+            ['ガス交換ユニット材料', mc['gas_unit']],
+            ['流路長 [mm]', mc['channel_length']],
+            ['回帰係数 a', mc['abc'][0]],
+            ['回帰係数 b', mc['abc'][1]],
+            ['回帰係数 c', mc['abc'][2]],
+            ['備考', mc['notes']],
+        ]
+        info_df = pd.DataFrame(info_items, columns=['項目', '値'])
         info_df.to_excel(writer, sheet_name='基本情報', index=False)
 
                 # I/S/R をまとめて1つの縦長テーブルに

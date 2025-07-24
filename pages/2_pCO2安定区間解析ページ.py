@@ -180,8 +180,8 @@ if res:
 
     # ⑤ 回帰係数 a, b, c 推定
     st.subheader("⑤ 回帰係数 a, b, c 推定")
-    med_vals  = medians[1:4]
-    uatm_vals = uatm_values[1:4]
+    med_vals  = medians[0:3]
+    uatm_vals = uatm_values[0:3]
     coeffs = None
     if all(m is not None for m in med_vals):
         e1, e2, e3 = 0.00387, 2.858, 0.0181
